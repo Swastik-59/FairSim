@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+pandas
+numpy
+scikit-learn
+xgboost
+dice-ml
+dowhy
+econml
+plotly
+pydantic
+python-multipart
+python-logging-loki

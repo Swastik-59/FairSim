@@ -1,0 +1,45 @@
+# Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+.hypothesis/
+
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Sensitive Data (Fairness Datasets)
+*.csv
+*.xlsx
+*.parquet
+*.jsonl
+
+# IDEs / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project Specific
+backend/__pycache__/
+frontend/__pycache__/
+.env
