@@ -15,6 +15,7 @@ class DataManager:
         self.numerical_features = []
         self.label_encoders = {}
         self.scaler = StandardScaler()
+        self.feature_defaults = {}
 
     def load_dataset(self, file_path_or_df: Any, target: str, sensitive_attributes: List[str]):
         if isinstance(file_path_or_df, str):
@@ -39,16 +40,68 @@ class DataManager:
 
     def _preprocess(self):
         self.processed_df = self.df.copy()
+
+        self.feature_defaults = {}
+        for col in self.feature_names:
+            if pd.api.types.is_numeric_dtype(self.df[col]):
+                self.feature_defaults[col] = float(self.df[col].median())
+            else:
+                mode = self.df[col].mode(dropna=True)
+                self.feature_defaults[col] = str(mode.iloc[0]) if not mode.empty else ""
         
         # Encode categorical variables
         for col in self.categorical_features:
             le = LabelEncoder()
-            self.processed_df[col] = le.fit_transform(self.processed_df[col].astype(str))
+            self.processed_df[col] = self.processed_df[col].fillna("Unknown").astype(str)
+            self.processed_df[col] = le.fit_transform(self.processed_df[col])
             self.label_encoders[col] = le
+
+        for col in self.numerical_features:
+            self.processed_df[col] = pd.to_numeric(self.processed_df[col], errors="coerce")
+            self.processed_df[col] = self.processed_df[col].fillna(float(self.feature_defaults.get(col, 0.0)))
             
         # Standardize numerical features
         if self.numerical_features:
             self.processed_df[self.numerical_features] = self.scaler.fit_transform(self.processed_df[self.numerical_features])
+
+    def _normalize_feature_dict(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        normalized = {}
+        for key, value in input_data.items():
+            normalized[key] = value
+            normalized[key.replace("-", "_")] = value
+
+        result = {}
+        for col in self.feature_names:
+            result[col] = normalized.get(col, self.feature_defaults.get(col))
+        return result
+
+    def transform_dataframe(self, input_df: pd.DataFrame) -> pd.DataFrame:
+        working = input_df.copy()
+
+        for col in self.feature_names:
+            if col not in working.columns:
+                working[col] = self.feature_defaults.get(col)
+
+        working = working[self.feature_names]
+
+        for col, le in self.label_encoders.items():
+            if col in working.columns:
+                classes = set(str(c) for c in le.classes_)
+                fallback = str(le.classes_[0]) if len(le.classes_) else ""
+                values = []
+                for raw in working[col].astype(str).tolist():
+                    values.append(raw if raw in classes else fallback)
+                working[col] = le.transform(values)
+
+        for col in self.numerical_features:
+            if col in working.columns:
+                working[col] = pd.to_numeric(working[col], errors="coerce")
+                working[col] = working[col].fillna(float(self.feature_defaults.get(col, 0.0)))
+
+        if self.numerical_features:
+            working[self.numerical_features] = self.scaler.transform(working[self.numerical_features])
+
+        return working
 
     def get_data_for_training(self):
         X = self.processed_df[self.feature_names]
@@ -62,12 +115,5 @@ class DataManager:
         return self.processed_df
 
     def transform_input(self, input_data: Dict[str, Any]):
-        input_df = pd.DataFrame([input_data])
-        for col, le in self.label_encoders.items():
-            if col in input_df.columns:
-                input_df[col] = le.transform(input_df[col].astype(str))
-        
-        if self.numerical_features:
-            input_df[self.numerical_features] = self.scaler.transform(input_df[self.numerical_features])
-            
-        return input_df
+        normalized = self._normalize_feature_dict(input_data)
+        return self.transform_dataframe(pd.DataFrame([normalized]))

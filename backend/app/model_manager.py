@@ -22,7 +22,7 @@ class ModelManager:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         
         if HAS_XGB:
-            self.model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss')
+            self.model = xgb.XGBClassifier(eval_metric='logloss')
         else:
             self.model = LogisticRegression(max_iter=1000)
             
