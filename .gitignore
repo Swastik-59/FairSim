@@ -6,7 +6,7 @@ env/
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
 .Python
@@ -14,23 +14,45 @@ pip-log.txt
 pip-delete-this-directory.txt
 .tox/
 .coverage
-.cache
+.coverage.*
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.ipynb_checkpoints/
 nosetests.xml
 coverage.xml
+htmlcov/
 *,cover
-.hypothesis/
 
 # Node / Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+frontend/coverage/
+frontend/*.tsbuildinfo
 node_modules/
 dist/
 dist-ssr/
 *.local
 
-# Sensitive Data (Fairness Datasets)
-*.csv
+# Generated model and runtime artifacts
+*.pkl
+*.joblib
+*.sav
+*.log
+backend/model.pkl
+
+# Temporary data exports
 *.xlsx
 *.parquet
 *.jsonl
+
+# Keep the bundled sample datasets tracked
+!sample_dataset.csv
+!backend/data/adult_sample.csv
 
 # IDEs / OS
 .DS_Store
@@ -43,3 +65,7 @@ dist-ssr/
 backend/__pycache__/
 frontend/__pycache__/
 .env
+.env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
