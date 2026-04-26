@@ -33,9 +33,27 @@ from gemini_service import (
 app = FastAPI(title="FairSim API")
 logger = logging.getLogger("fairsim")
 
+
+def _build_allowed_origins() -> List[str]:
+    default_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://fair-sim.vercel.app",
+    ]
+    configured = os.getenv("FRONTEND_ORIGINS", "")
+    if not configured.strip():
+        return default_origins
+
+    extra_origins = []
+    for origin in configured.split(","):
+        cleaned = origin.strip().rstrip("/")
+        if cleaned:
+            extra_origins.append(cleaned)
+    return list(dict.fromkeys(default_origins + extra_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_build_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

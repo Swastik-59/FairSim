@@ -1,8 +1,11 @@
 import axios from 'axios'
 import { CausalResult, ColumnsMeta, CounterfactualResult, FairnessMetrics, PredictionResult, SimulationParams, SimulationResult } from './types'
 
+const defaultApiUrl =
+  process.env.NODE_ENV === 'production' ? 'https://fairsim.onrender.com' : 'http://localhost:8000'
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || defaultApiUrl,
   timeout: 30000,
 })
 
