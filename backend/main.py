@@ -71,7 +71,31 @@ class SimulationRequest(BaseModel):
 
 
 def success(data: Dict[str, Any]) -> Dict[str, Any]:
-    return {"status": "success", "data": data}
+    return {"status": "success", "data": _json_safe(data)}
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError):
+        return default
+    return numeric_value if np.isfinite(numeric_value) else default
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, np.generic):
+        return _json_safe(value.item())
+    if isinstance(value, float):
+        return value if np.isfinite(value) else 0.0
+    if value is pd.NA:
+        return None
+    return value
 
 
 def build_engines() -> None:
@@ -546,7 +570,7 @@ async def get_causal_results():
 
         try:
             results = ce.estimate_effect()
-            ate = float(results.get("ate", 0.0))
+            ate = _safe_float(results.get("ate", 0.0))
             sign = "increases" if ate > 0 else "decreases"
             interpretation = (
                 f"Average Treatment Effect (ATE) measures the average change in {readable_outcome} when {readable_treatment} changes. "
@@ -563,7 +587,7 @@ async def get_causal_results():
         try:
             attr = treatment
             overall_mean_value = pd.to_numeric(dm.processed_df[dm.target], errors="coerce").mean()
-            overall_mean = float(0.0 if pd.isna(overall_mean_value) else overall_mean_value)
+            overall_mean = _safe_float(overall_mean_value)
             raw_attr = dm.df[attr]
 
             if pd.api.types.is_numeric_dtype(raw_attr):
@@ -573,7 +597,7 @@ async def get_causal_results():
                     for interval in buckets.cat.categories:
                         mask = buckets.astype(str) == str(interval)
                         subgroup = pd.to_numeric(dm.processed_df.loc[mask, dm.target], errors="coerce")
-                        effect = float(subgroup.mean() - overall_mean) if len(subgroup) else 0.0
+                        effect = _safe_float(subgroup.mean() - overall_mean) if len(subgroup) else 0.0
                         group_effects.append(
                             {
                                 "label": f"{readable_treatment} {interval}",
@@ -585,7 +609,7 @@ async def get_causal_results():
                     for val in unique_values[:8]:
                         mask = raw_attr == val
                         subgroup = pd.to_numeric(dm.processed_df.loc[mask, dm.target], errors="coerce")
-                        effect = float(subgroup.mean() - overall_mean) if len(subgroup) else 0.0
+                        effect = _safe_float(subgroup.mean() - overall_mean) if len(subgroup) else 0.0
                         group_effects.append(
                             {
                                 "label": f"{readable_treatment}: {val}",
@@ -597,7 +621,7 @@ async def get_causal_results():
                 for val in raw_attr.dropna().astype(str).unique()[:8]:
                     mask = raw_attr.astype(str) == val
                     subgroup = pd.to_numeric(dm.processed_df.loc[mask, dm.target], errors="coerce")
-                    effect = float(subgroup.mean() - overall_mean) if len(subgroup) else 0.0
+                    effect = _safe_float(subgroup.mean() - overall_mean) if len(subgroup) else 0.0
                     group_effects.append(
                         {
                             "label": f"{readable_treatment}: {val}",

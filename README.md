@@ -1,351 +1,341 @@
-# 🔮 FairSim — Counterfactual Fairness Simulation Engine
+# FairSim
 
-> **"What happens to fairness if we change the world?"**
+FairSim is a full-stack fairness analysis and simulation platform for tabular ML systems. It combines model training, prediction, counterfactual analysis, fairness metrics, causal inference, and Gemini-assisted explanations in one workflow.
 
-FairSim goes beyond detecting bias — it *simulates alternate realities* to show how AI decisions would change if sensitive factors (gender, race, age) were different. Built for the intersection of causal AI, counterfactual reasoning, and real-world policy impact.
+The goal of the project is to help teams answer practical questions such as:
 
-**Powered by:**
-- 🤖 **Google Gemini 2.5 Flash** for AI-generated fairness audits, policy recommendations, and bias explanations
-- 🔁 **DiCE** (Diverse Counterfactual Explanations) for generating "what-if" scenarios
-- 🧠 **DoWhy** for causal inference and treatment effect estimation
-- 📊 **XGBoost** for fast, interpretable predictions
-- 🎨 **Next.js 14** with Tailwind CSS, Framer Motion, and Three.js for stunning visualizations
+- Is the model treating sensitive groups differently?
+- Would the prediction change if a sensitive attribute changed?
+- How do fairness metrics move under simulated policy shifts?
+- What does the causal signal say about the relationship between a sensitive attribute and the outcome?
 
----
+## Current Status
 
-## ✨ What Makes FairSim Different
+The project is currently implemented as a working local development stack with:
 
-| Traditional Bias Tools | FairSim |
-|---|---|
-| Check if model is biased | Simulate alternate realities |
-| Group-level statistics | Individual-level bias detection |
-| Correlation-based | Causal inference (DoWhy) |
-| Static metrics | Interactive simulation engine |
-| Manual analysis | **AI-narrated audit (Gemini)** |
-| Limited datasets | **Upload ANY CSV** |
+- A FastAPI backend for upload, preprocessing, training, prediction, fairness, counterfactuals, simulation, and causal analysis
+- A Next.js 14 frontend with dedicated views for the dashboard, upload flow, prediction, fairness, counterfactuals, simulation, and causal analysis
+- Gemini-powered narrative features for fairness summaries, counterfactual explanations, simulation stories, and policy recommendations
+- A bundled sample dataset so the app can be explored without preparing a custom CSV first
 
----
+What is already in place:
 
-## 🚀 Core Features
+- Dataset upload and schema inspection
+- Model training with persisted backend state
+- Prediction and counterfactual generation
+- Fairness metrics and subgroup reporting
+- Distribution-shift simulation
+- Causal effect estimation with ATE/CATE outputs
+- AI-generated explanations and recommendations
 
-### 1. 📂 **Upload Any Dataset**
-Drop any CSV — loan approvals, hiring records, credit scoring, healthcare decisions. 
-- 🤖 Gemini AI auto-detects your target column and sensitive attributes
-- 📋 Automatic categorical encoding and missing value imputation
-- 🎯 Support for any number of columns and data types
+How the current flow works:
 
-### 2. 🤖 **Gemini-Powered Intelligence**
-- **Smart Column Detection**: Auto-identifies sensitive attributes and outcome variable with reasoning
-- **AI Fairness Audit**: Plain-English interpretation of all bias metrics for non-technical stakeholders
-- **Counterfactual Explainer**: "Why did the prediction flip? Is that fair?"
-- **Policy Recommendations**: 5 actionable interventions ranked by priority and timeframe
-- **Simulation Story Mode**: Policy brief narrating what-if scenarios for policymakers
+1. Upload a CSV dataset and identify the target column plus one or more sensitive attributes.
+2. Train the backend model on the uploaded dataset.
+3. Use prediction, counterfactual, fairness, simulation, and causal endpoints against that trained state.
+4. Present the results in the Next.js dashboard and dedicated analysis pages.
 
-### 3. 🔁 **Counterfactual Engine**
-*"If this same person had a different gender, would they still get approved?"*
-- Generates N counterfactuals per individual using DiCE
-- Keeps all features constant except sensitive attributes
-- Shows exactly which features caused prediction changes
-- Visual diff cards highlighting changed values
-- Prediction flip detection (⚠️ bias indicator)
+Current implementation notes:
 
-### 4. ⚖️ **Fairness Engine**
-- **Counterfactual Fairness Score**: % of cases where sensitive attribute change flips decision
-- **Demographic Parity**: Fairness across groups (0=perfect, 1=disparate)
-- **Equal Opportunity**: Equal false negative rates across demographics
-- **Individual-level bias flagging**: Red-flag cases for manual review
-- **Visual bias heatmap**: Color-coded fairness across demographic groups
+- The backend keeps its working dataset and trained model in process state during a session.
+- The causal endpoint returns a safe JSON payload even when the estimator produces non-finite values.
+- Several AI-generated outputs depend on a configured Gemini API key, but the non-AI core workflow still runs without it.
+- Three.js-based visuals are intended to stay client-side inside the App Router.
 
-### 5. 📊 **Interactive Simulation Dashboard**
-- **3 Real-time Sliders**: Adjust female applicant %, income distribution, education levels
-- **Live fairness recomputation**: Metrics update as you slide
-- **Gemini Policy Brief**: AI narrates what your simulation means for policy
-- **Before/after comparison**: See impact of your interventions
+## Key Features
 
-### 6. 🧠 **Causal Inference Module**
-Uses DoWhy causal graphs to estimate:
-- **ATE** (Average Treatment Effect) of sensitive attributes on outcomes
-- **CATE** (Conditional Treatment Effect) across subgroups
-- 3D FairnessGlobe visualization of causal effects
+### Dataset Upload and Preparation
 
----
+- Upload a CSV dataset and define the target column plus sensitive attributes
+- Preview dataset columns, types, sample rows, and missing-value counts
+- Automatically preprocess categorical and numerical data for model training
+- Use the bundled Adult sample dataset as a starting point
+- Validate that the chosen target and sensitive columns exist before training begins
+- Preserve the original CSV values for downstream inspection while preparing an encoded training frame internally
 
-## 🛠️ Tech Stack
+### Model Training and Prediction
 
-| Layer | Technology |
-|---|---|
-| **Frontend** | Next.js 14 (App Router) + TypeScript + Tailwind CSS |
-| **UI/Animation** | Framer Motion, Radix UI, Recharts, Three.js |
-| **Backend** | FastAPI (Python) + Uvicorn |
-| **ML Model** | XGBoost + scikit-learn (with LogisticRegression fallback) |
-| **Counterfactuals** | DiCE (dice-ml) |
-| **Causal Inference** | DoWhy + EconML |
-| **AI Intelligence** | Google Generative AI (Gemini 2.5 Flash) |
-| **3D Graphics** | @react-three/fiber + @react-three/drei |
-| **Data Processing** | pandas, numpy |
+- Train a tabular classifier on the uploaded dataset
+- Persist the trained model in the backend workspace
+- Run predictions with default-value fallbacks for partially specified feature inputs
+- Return both numeric predictions and human-readable labels
+- Produce a probability score alongside the predicted class
+- Include a short prediction summary that the frontend can surface directly
+- Save the trained model after successful training so later requests can reuse it
 
----
+### Counterfactual Analysis
 
-## ⚡ Quick Start
+- Generate alternative records that preserve most of the original features
+- Compare original and counterfactual predictions
+- Highlight which feature changes are associated with a different decision
+- Provide explanation text for downstream UI and Gemini prompts
+- Fall back to randomized counterfactual candidates if the local DiCE generation path is unavailable
+- Return the original record, the generated counterfactual set, changed feature lists, and prediction flip flags
+- Use the output both for UI comparison cards and for narrative explanations
+
+### Fairness Evaluation
+
+- Counterfactual fairness scoring
+- Demographic parity and equal opportunity summaries
+- Biased-individual detection for case-by-case review
+- Group-level metrics for dashboard visualizations
+- Return both aggregate fairness scores and the list of flagged individuals
+- Support subgroup comparisons so the UI can show where the model behaves differently across groups
+- Provide a compact fairness summary string for the dashboard and AI narrative layers
+
+### Simulation and Causal Analysis
+
+- Simulate distribution shifts across sensitive groups and numeric features
+- Recompute fairness metrics after each simulated shift
+- Estimate ATE and subgroup-level causal effects with DoWhy
+- Surface causal results in a format that can be used directly by the frontend
+- Support both explicit feature shifts and higher-level group shift adjustments
+- Generate an 8-step fairness timeline so the UI can show change over the simulated progression
+- Provide subgroup effects in a label-to-value mapping for chart rendering
+
+### Gemini Assistance
+
+- Column detection for uploaded CSV files
+- Plain-English fairness narratives
+- Counterfactual explanations
+- Simulation policy stories
+- Policy recommendation generation
+- Designed to translate the technical metrics into stakeholder-friendly language
+- Helpful for reports, demos, and non-technical review workflows
+
+## Tech Stack
+
+### Backend
+
+- FastAPI
+- Uvicorn
+- pandas
+- numpy
+- scikit-learn
+- XGBoost
+- DoWhy
+- DiCE
+- Google Generative AI
+
+### Frontend
+
+- Next.js 14 App Router
+- React 18
+- TypeScript
+- Tailwind CSS
+- Framer Motion
+- Recharts
+- Three.js with React Three Fiber and Drei
+- Radix UI components
+
+## Project Structure
+
+```text
+FairSim/
+├── backend/
+│   ├── main.py                # FastAPI application and API routes
+│   ├── gemini_service.py      # Gemini integrations
+│   ├── app/
+│   │   ├── data_manager.py    # CSV loading, preprocessing, encoding
+│   │   ├── model_manager.py   # Model training and inference
+│   │   ├── cf_engine.py       # Counterfactual generation helpers
+│   │   ├── fairness_engine.py # Fairness metrics and subgroup logic
+│   │   ├── causal_engine.py   # Causal inference with DoWhy
+│   │   └── simulation_engine.py
+│   └── data/
+│       └── adult_sample.csv   # Bundled example dataset
+├── frontend/
+│   ├── src/app/
+│   │   ├── page.tsx           # Landing page
+│   │   ├── dashboard/         # Summary dashboard
+│   │   ├── upload/            # Dataset upload flow
+│   │   ├── predict/           # Prediction UI
+│   │   ├── counterfactual/    # Counterfactual analysis UI
+│   │   ├── fairness/          # Fairness metrics UI
+│   │   ├── simulate/          # Simulation UI
+│   │   └── causal/            # Causal analysis UI
+│   ├── src/components/        # UI, charts, layout, AI, and 3D components
+│   └── package.json
+└── README.md
+```
+
+## Getting Started
 
 ### Prerequisites
-- **Python 3.9+**
-- **Node.js 18+**
-- **Google AI Studio API key** (free at [aistudio.google.com](https://aistudio.google.com))
 
-### 1. Backend Setup
+- Python 3.12+ recommended
+- Node.js 18+
+- A Gemini API key if you want the AI narration features
+
+Recommended setup files:
+
+- `backend/.env` for backend secrets and API keys
+- `frontend/.env.local` for frontend runtime configuration, if needed
+
+### Backend Setup
 
 ```bash
 cd backend
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
 
-# Setup environment
 cp .env.example .env
-# Edit .env and add your GEMINI_API_KEY from aistudio.google.com
+# Set GEMINI_API_KEY in .env
 
-# Start backend
 uvicorn main:app --reload --port 8000
 ```
 
-✅ Backend running on `http://localhost:8000`
+Backend runs at `http://localhost:8000`.
 
-### 2. Frontend Setup
+If you do not want Gemini features, you can still run the core product as long as the backend dependencies are installed and the sample or uploaded dataset is available.
+
+### Frontend Setup
 
 ```bash
 cd frontend
 
-# Install dependencies
 npm install
-
-# Setup environment
-cp .env.example .env.local
-# NEXT_PUBLIC_API_URL=http://localhost:8000 (already set)
-
-# Start development server
 npm run dev
 ```
 
-✅ Frontend running on `http://localhost:3000`
+Frontend runs at `http://localhost:3000`.
 
-### 3. First Steps
-1. Open http://localhost:3000 in your browser
-2. You'll be prompted to upload a CSV dataset
-3. Gemini will auto-detect your target column and sensitive attributes
-4. Click "Train Model" to begin
-5. Explore the fairness, simulation, and causal inference dashboards
+If the frontend cannot reach the backend, verify that the API URL points to the backend server and that CORS is allowed for the local origin.
 
----
+### Typical Workflow
 
-## 📁 Project Structure
+1. Open the frontend in your browser.
+2. Upload a CSV dataset or use the sample dataset.
+3. Confirm the target column and sensitive attributes.
+4. Train the model.
+5. Review prediction, fairness, counterfactual, simulation, and causal results.
 
-```
-FairSim/
-├── backend/
-│   ├── main.py                    # FastAPI app + all endpoints
-│   ├── gemini_service.py          # Gemini AI integration
-│   ├── app/
-│   │   ├── data_manager.py        # CSV parsing, encoding, preprocessing
-│   │   ├── model_manager.py       # XGBoost training & inference
-│   │   ├── cf_engine.py           # DiCE counterfactual generator
-│   │   ├── fairness_engine.py     # Fairness metrics computation
-│   │   ├── causal_engine.py       # DoWhy causal inference
-│   │   └── simulation_engine.py   # Distribution shift simulator
-│   ├── data/
-│   │   └── adult_sample.csv       # Example UCI Adult Income dataset
-│   ├── .env.example               # Template for environment variables
-│   └── requirements.txt
-│
-├── frontend/
-│   ├── src/
-│   │   ├── app/                   # Next.js App Router pages
-│   │   │   ├── page.tsx           # 🏠 Landing page with hero scene
-│   │   │   ├── dashboard/         # 📊 Metrics & analytics
-│   │   │   ├── predict/           # 🔮 Make predictions
-│   │   │   ├── counterfactual/    # 🔁 Generate counterfactuals
-│   │   │   ├── fairness/          # ⚖️ Fairness audit
-│   │   │   ├── simulate/          # 📈 Interactive simulation
-│   │   │   ├── causal/            # 🧠 Causal analysis
-│   │   │   └── upload/            # 📂 Upload datasets
-│   │   │
-│   │   ├── components/
-│   │   │   ├── layout/            # Navbar, Sidebar, AppShell
-│   │   │   ├── ui/                # Base UI primitives (GlassCard, GlowButton, etc.)
-│   │   │   ├── charts/            # Recharts components
-│   │   │   ├── three/             # Three.js 3D components
-│   │   │   ├── upload/
-│   │   │   │   └── SmartUploader.tsx  # Multi-step CSV upload wizard
-│   │   │   └── gemini/            # AI-powered components
-│   │   │       ├── FairnessNarrative.tsx
-│   │   │       ├── PolicyRecommendations.tsx
-│   │   │       ├── CounterfactualExplainer.tsx
-│   │   │       └── SimulationStory.tsx
-│   │   │
-│   │   └── lib/
-│   │       ├── api.ts             # API client with Axios
-│   │       ├── types.ts           # TypeScript interfaces
-│   │       └── utils.ts           # Utility functions
-│   │
-│   ├── tailwind.config.ts         # Custom dark theme
-│   ├── next.config.mjs            # Next.js configuration
-│   ├── tsconfig.json              # TypeScript config
-│   ├── package.json               # Dependencies + scripts
-│   └── .env.local                 # Frontend environment (localhost:8000)
-│
-└── README.md                       # This file
-```
+For a first smoke test, the bundled Adult sample dataset is the fastest path because it already matches the backend's expected tabular format.
 
----
+## How The Analysis Chain Works
 
-## 🎯 Example Use Cases
+The project is organized as a sequential analysis pipeline:
 
-### 💰 **Loan Approval System**
-Upload bank loan data → Detect if approved/rejected (target) and gender/race (sensitive).
-- 📊 See what % of applicants would flip decisions if gender changed
-- 🤖 Get Gemini-powered policy brief on discrimination risk
-- 💡 5 prioritized recommendations to reduce lending discrimination
+- `upload` stores the dataset and metadata for the session.
+- `train` preprocesses the data and builds the classifier.
+- `predict` runs the model against a feature payload.
+- `counterfactual` generates what-if alternatives and checks whether the prediction flips.
+- `fairness` aggregates fairness metrics and flags individuals whose outcomes are sensitive to attribute changes.
+- `simulate` applies controlled shifts to the dataset and recomputes fairness under the modified distribution.
+- `causal` estimates the causal effect of the sensitive attribute on the target outcome.
 
-### 👔 **Hiring System**
-Upload HR records (education, experience, demographics, hired/rejected).
-- 🔍 Individual audit: Does this person face bias?
-- 🔁 Counterfactuals: Would they be hired with different background?
-- 📋 Policy recommendations: Blind resume review, diverse hiring panels, etc.
+This ordering matters because later steps depend on the trained model and the dataset state created earlier in the flow.
 
-### 🏥 **Healthcare Treatment Allocation**
-Upload patient data (age, comorbidities, demographics, treatment approved/denied).
-- ⚖️ Check for racial/age disparities in treatment eligibility
-- 🧠 Causal analysis: Is age *causing* lower treatment rates, or just correlated?
-- 📊 Simulate impact of age-blind criteria
+## API Reference
 
-### 💳 **Credit Scoring**
-Upload credit bureau data with approvals and demographics.
-- 📈 Fairness simulation: What if we remove hard-to-verify features?
-- 🤖 Gemini audit explains why demographics matter to your model
-- 💡 Get specific actions: fairness constraints, retraining strategies
+All backend responses use a standard envelope:
 
----
-
-## 🔑 API Reference
-
-### Data Management
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/health` | GET | Health check; returns `model_loaded` status |
-| `/upload` | POST | Upload CSV dataset; auto-detect columns via Gemini |
-| `/columns` | GET | Get metadata about current dataset columns |
-| `/train` | POST | Train XGBoost model on uploaded (or default) dataset |
-
-### Predictions & Explanations
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/predict` | POST | Predict outcome for given feature values |
-| `/counterfactual` | POST | Generate N counterfactuals; identify bias via prediction flips |
-
-### Fairness Analysis
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/fairness` | GET | Compute counterfactual fairness score, demographic parity, equal opportunity, biased individuals |
-| `/simulate` | POST | Run distribution shift simulation; recompute fairness under different conditions |
-| `/causal` | GET | Estimate average treatment effect (ATE) and conditional treatment effect (CATE) |
-
-### Gemini AI Endpoints
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/gemini/detect-columns` | POST | Upload CSV → Gemini detects target + sensitive attributes + domain |
-| `/gemini/fairness-narrative` | GET | Generate plain-English fairness audit (3 paragraphs) |
-| `/gemini/explain-counterfactual` | POST | Explain why a counterfactual changed the prediction |
-| `/gemini/simulation-story` | POST | Write policy brief from simulation before/after metrics |
-| `/gemini/policy-recommendations` | GET | Generate 5 prioritized recommendations to reduce bias |
-
-### Response Format
-
-All endpoints return standardized JSON envelopes:
-
-**Success:**
 ```json
 {
   "status": "success",
-  "data": { ...endpoint-specific data... }
+  "data": {}
 }
 ```
 
-**Error:**
+Errors use:
+
 ```json
 {
   "status": "error",
-  "message": "Error description"
+  "message": "Readable error message"
 }
 ```
 
----
+### Core Endpoints
 
-## 🚀 Deployment
+| Endpoint | Method | Purpose |
+|---|---:|---|
+| `/health` | GET | Check backend status and loaded state |
+| `/upload` | POST | Upload a CSV and register target/sensitive columns |
+| `/columns` | GET | Inspect the current dataset schema |
+| `/train` | POST | Train the model on the uploaded dataset |
+| `/predict` | POST | Run a prediction for a feature payload |
+| `/counterfactual` | POST | Generate counterfactual examples |
+| `/fairness` | GET | Compute fairness metrics and biased cases |
+| `/simulate` | POST | Simulate distribution shifts and recompute fairness |
+| `/causal` | GET | Estimate causal effects for the sensitive attribute |
+| `/download/example-dataset` | GET | Download the bundled sample dataset |
 
-### Frontend (Vercel)
+Endpoint notes:
+
+- `/upload` expects a CSV file plus form fields for `target_column` and `sensitive_attributes`.
+- `/train` uses the uploaded session dataset and stores the trained model in memory and on disk.
+- `/predict` accepts a partial feature payload and fills missing values from dataset defaults.
+- `/counterfactual` accepts `num_counterfactuals` and returns both generated alternatives and change annotations.
+- `/fairness` reports aggregate fairness scores plus individual bias flags.
+- `/simulate` accepts distribution-shift parameters and returns before/after metrics plus a fairness timeline.
+- `/causal` returns `ate`, `cate`, `group_effects`, and explanatory notes for the analysis view.
+
+### Gemini Endpoints
+
+| Endpoint | Method | Purpose |
+|---|---:|---|
+| `/gemini/detect-columns` | POST | Detect target and sensitive columns from an uploaded CSV |
+| `/gemini/fairness-narrative` | GET | Generate a plain-English fairness summary |
+| `/gemini/explain-counterfactual` | POST | Explain why a counterfactual changed the result |
+| `/gemini/simulation-story` | POST | Generate a policy-style simulation narrative |
+| `/gemini/policy-recommendations` | GET | Produce ranked mitigation recommendations |
+
+These endpoints are optional from a system standpoint, but they add the narrative layer that makes the results easier to present to non-technical stakeholders.
+
+## Configuration
+
+The following settings are the most important when running the project locally:
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `GEMINI_API_KEY` | Backend `.env` | Enables Gemini-powered narratives and recommendations |
+| Backend host/port | Backend startup command | Controls where the API is served locally |
+| Frontend API base URL | Frontend env file, if used | Points the UI to the FastAPI backend |
+
+If you customize the host or port, update the frontend to match so the analysis pages can reach the API.
+
+## Development Notes
+
+- The backend expects a trained model before prediction, fairness, counterfactual, simulation, or causal endpoints can be used.
+- The frontend is built with the Next.js App Router, so each page lives under `frontend/src/app`.
+- Three.js-based components should remain client-side only to avoid server-side rendering issues in the App Router.
+- The sample dataset in `backend/data/adult_sample.csv` is useful for quick demos and smoke testing.
+- The backend currently keeps state in memory, so restarting the server resets the uploaded dataset and trained model.
+- The project is most useful for structured tabular datasets where a single outcome column can be clearly identified.
+- If you see `nan` values in causal output, the backend now sanitizes them before serialization.
+
+## Deployment
+
+### Frontend
+
 ```bash
-# Build for production
+cd frontend
 npm run build
-
-# Deploy to Vercel
-vercel deploy --prod
 ```
 
-### Backend (Railway, Heroku, etc.)
-```bash
-# Set GEMINI_API_KEY environment variable
-# Push to your hosting platform
-git push heroku main
-```
+Deploy the built app to your preferred Next.js hosting platform, such as Vercel.
 
----
+### Backend
 
-## 📄 License
+Deploy `backend/main.py` with your ASGI host of choice and ensure the environment includes `GEMINI_API_KEY` when Gemini features are enabled.
 
-MIT — Use freely for research, education, and nonprofit purposes.
+## Contributing
 
----
+Contributions are welcome. Good areas for future work include:
 
-## 🤝 Contributing
+- Additional fairness metrics and subgroup views
+- Exportable reports and downloadable artifacts
+- Expanded simulation controls
+- More dataset examples and validation helpers
+- End-to-end tests for the upload-to-analysis workflow
+- Stronger persistence for trained models and uploaded session state
+- Per-page loading and error states in the frontend analysis views
+- More configurable causal assumptions and sensitivity analysis
 
-Found a bug? Want to add bonus features? Issues and PRs welcome!
+## License
 
-### Bonus Features (Future Enhancements)
-
-- 🔥 **Bias Heatmap**: 2D heatmap showing fairness intensity across demographic groups
-- ⏱️ **Fairness Timeline**: Line chart showing fairness improvement over retraining cycles
-- 🔍 **Individual Audit Mode**: Automatic counterfactual + fairness verdict for any individual
-- 📊 **Dataset Comparison**: Upload 2 datasets, compare fairness side-by-side
-- 📄 **PDF Export**: Download full fairness report as PDF (backend `/export/report`)
-
----
-
-## 🙏 Acknowledgments
-
-Built at the intersection of:
-- **Counterfactual Fairness** ([Kusner et al., 2017](https://arxiv.org/abs/1705.08563))
-- **Diverse Counterfactual Explanations** ([Mothilal et al., 2021](https://arxiv.org/abs/1912.08045))
-- **Causal Inference** ([Pearl, 2000](https://www.amazon.com/Causality-Reasoning-Inference-Judea-Pearl/dp/0521895685))
-
-Special thanks to Google Generative AI team for Gemini API access.
-
----
-
-## 💬 Questions?
-
-- **API Issues?** Check `/health` endpoint
-- **Training fails?** Ensure CSV has target column + numeric/categorical features
-- **Gemini not working?** Verify `GEMINI_API_KEY` in `.env`
-- **Frontend crashes?** Check browser console for errors; ensure backend is running
-
-**Get your free Gemini API key:** https://aistudio.google.com
-
-**Happy auditing! 🔮⚖️**
+MIT
