@@ -1,6 +1,9 @@
 export interface PredictionResult {
   prediction: 0 | 1
+  prediction_label: string
+  prediction_summary: string
   probability: number
+  target_column: string
   features: Record<string, unknown>
 }
 
@@ -9,13 +12,25 @@ export interface CounterfactualResult {
   counterfactuals: Record<string, unknown>[]
   changed_features: string[][]
   prediction_changed: boolean[]
+  summary?: string
 }
 
 export interface FairnessMetrics {
   counterfactual_fairness_score: number
   demographic_parity: number
   equal_opportunity: number
-  biased_individuals: number[]
+  biased_individuals: Array<{
+    index: number
+    original_prediction: number
+    counterfactual_prediction: number
+    bias_flag: boolean
+    sensitive_attribute: string
+    original_value: string
+    counterfactual_value: string
+    explanation: string
+  }>
+  biased_individuals_count?: number
+  counterfactual_summary?: string
 }
 
 export interface SimulationParams {
@@ -29,6 +44,7 @@ export interface SimulationParams {
 export interface CausalResult {
   ate: number
   cate: Record<string, number>
+  group_effects?: Array<{ label: string; effect: number; explanation: string }>
   interpretation: string
   treatment?: string
   outcome?: string

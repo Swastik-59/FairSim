@@ -7,6 +7,7 @@ import { ColumnSchema, CounterfactualResult } from '@/lib/types'
 import { Badge } from '@/components/ui/Badge'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { GlowButton } from '@/components/ui/GlowButton'
+import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen'
 import CounterfactualExplainer from '@/components/gemini/CounterfactualExplainer'
 import { useWorkflow } from '@/lib/WorkflowContext'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -49,6 +50,15 @@ export default function CounterfactualPage() {
   // Early return AFTER all hooks
   if (!isModelTrained) {
     return <EmptyState message="Counterfactual analysis requires a trained dataset." />
+  }
+
+  if (metaApi.loading && schema.length === 0) {
+    return (
+      <PageLoadingScreen
+        title="Preparing counterfactual alternatives"
+        subtitle="FairSim is reading the uploaded dataset and generating a custom what-if workspace with columns, categories, and comparable alternatives."
+      />
+    )
   }
 
   const onSubmit = async (event: FormEvent) => {
@@ -101,12 +111,18 @@ export default function CounterfactualPage() {
           <Badge variant="accent">Flip Rate {flipRate.toFixed(1)}%</Badge>
         </div>
 
+        <p className="mb-4 text-sm text-slate-400">
+          These alternatives are generated from the uploaded dataset, so they reflect realistic values and can change on each request.
+        </p>
+
         {api.loading ? (
           <div className="space-y-3">
             <div className="h-20 animate-pulse rounded-xl bg-white/10" />
             <div className="h-20 animate-pulse rounded-xl bg-white/10" />
           </div>
         ) : null}
+
+        {result?.summary ? <p className="mb-3 text-xs text-slate-500">{result.summary}</p> : null}
 
         <motion.div initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }} className="space-y-3">
           {result?.counterfactuals.map((cf, idx) => (

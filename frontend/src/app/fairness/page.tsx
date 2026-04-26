@@ -4,8 +4,8 @@ import nextDynamic from 'next/dynamic'
 import { useEffect, useMemo, useState } from 'react'
 import { getFairnessMetrics } from '@/lib/api'
 import { FairnessMetrics } from '@/lib/types'
-import { Badge } from '@/components/ui/Badge'
 import { GlassCard } from '@/components/ui/GlassCard'
+import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen'
 import FairnessNarrative from '@/components/gemini/FairnessNarrative'
 import PolicyRecommendations from '@/components/gemini/PolicyRecommendations'
 import { useWorkflow } from '@/lib/WorkflowContext'
@@ -37,10 +37,6 @@ export default function FairnessPage() {
     void load()
   }, [isModelTrained])
 
-  if (!isModelTrained) {
-    return <EmptyState message="Run model training first to view fairness metrics." />
-  }
-
   const gaugeData = useMemo(
     () => [{ name: 'score', value: (metrics?.counterfactual_fairness_score ?? 0) * 100, fill: '#6366f1' }],
     [metrics],
@@ -51,12 +47,28 @@ export default function FairnessPage() {
     { metric: 'Equal Opportunity', value: (metrics?.equal_opportunity ?? 0) * 100 },
   ]
 
+  if (!isModelTrained) {
+    return <EmptyState message="Run model training first to view fairness metrics." />
+  }
+
+  if (api.loading && !metrics) {
+    return (
+      <PageLoadingScreen
+        title="Preparing fairness audit"
+        subtitle="FairSim is computing counterfactual fairness, group parity, and the records that deserve human review."
+      />
+    )
+  }
+
   return (
     <div className="space-y-4">
       {api.error ? <p className="rounded-lg border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-300">{api.error}</p> : null}
       <div className="grid gap-4 lg:grid-cols-3">
         <GlassCard className="lg:col-span-1">
           <h3 className="mb-3 text-lg font-semibold">Counterfactual Fairness Score</h3>
+          <p className="mb-3 text-sm text-slate-400">
+            This shows how often the model kept the same decision when a protected attribute was changed.
+          </p>
           {api.loading ? (
             <div className="h-44 animate-pulse rounded-xl bg-white/10" />
           ) : (
@@ -71,6 +83,7 @@ export default function FairnessPage() {
               </div>
             </div>
           )}
+          {metrics?.counterfactual_summary ? <p className="mt-3 text-xs text-slate-500">{metrics.counterfactual_summary}</p> : null}
         </GlassCard>
 
         <GlassCard className="lg:col-span-2">
@@ -90,25 +103,32 @@ export default function FairnessPage() {
       </div>
 
       <GlassCard>
-        <h3 className="mb-3 text-lg font-semibold">Biased Individuals</h3>
+        <h3 className="mb-3 text-lg font-semibold">Flagged Records</h3>
+        <p className="mb-4 text-sm text-slate-400">
+          These records changed outcome when a protected attribute was altered. That does not prove unfairness by itself, but it is a strong signal worth reviewing.
+        </p>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="text-left text-muted">
               <tr>
-                <th className="py-2">Index</th>
-                <th className="py-2">Flag</th>
+                <th className="py-2">Record</th>
+                <th className="py-2">What changed</th>
+                <th className="py-2">Why it matters</th>
               </tr>
             </thead>
             <tbody>
-              {(metrics?.biased_individuals ?? []).map((id) => (
-                <tr key={id} className="border-t border-white/5">
-                  <td className="py-2">#{id}</td>
-                  <td className="py-2"><Badge variant="danger">Risk</Badge></td>
+              {(metrics?.biased_individuals ?? []).map((item) => (
+                <tr key={item.index} className="border-t border-white/5 align-top">
+                  <td className="py-2">#{item.index}</td>
+                  <td className="py-2 text-slate-300">
+                    {item.sensitive_attribute.replace(/_/g, ' ')}: {item.original_value} → {item.counterfactual_value}
+                  </td>
+                  <td className="py-2 text-slate-400">{item.explanation}</td>
                 </tr>
               ))}
               {!api.loading && (metrics?.biased_individuals.length ?? 0) === 0 ? (
                 <tr>
-                  <td className="py-3 text-muted" colSpan={2}>No biased individuals flagged in current sample.</td>
+                  <td className="py-3 text-muted" colSpan={3}>No records were flagged in the current sample.</td>
                 </tr>
               ) : null}
             </tbody>

@@ -137,6 +137,7 @@ def safe_counterfactual_fairness(max_samples: int = 150) -> Dict[str, Any]:
         current_sensitive = str(row.get(sensitive_attr))
         alternatives = [c for c in candidates if c != current_sensitive]
         changed = False
+        changed_to = current_sensitive
 
         for alt in alternatives[:2]:
             cf = dict(original)
@@ -144,6 +145,7 @@ def safe_counterfactual_fairness(max_samples: int = 150) -> Dict[str, Any]:
             cf_pred = int(mm.predict(dm.transform_input(cf))[0][0])
             if cf_pred != original_pred:
                 changed = True
+                changed_to = alt
                 break
 
         if changed:
@@ -151,9 +153,17 @@ def safe_counterfactual_fairness(max_samples: int = 150) -> Dict[str, Any]:
         details.append(
             {
                 "index": i,
-                "original": original_pred,
-                "counterfactual": 1 - original_pred if changed else original_pred,
+                "original_prediction": original_pred,
+                "counterfactual_prediction": 1 - original_pred if changed else original_pred,
                 "bias_flag": changed,
+                "sensitive_attribute": sensitive_attr,
+                "original_value": current_sensitive,
+                "counterfactual_value": changed_to,
+                "explanation": (
+                    f"Prediction changed when {sensitive_attr.replace('_', ' ')} moved from {current_sensitive} to {changed_to}."
+                    if changed
+                    else f"Prediction stayed the same when {sensitive_attr.replace('_', ' ')} changed from {current_sensitive}."
+                ),
             }
         )
 
@@ -172,6 +182,62 @@ def compute_fairness_summary(y_true, y_pred, sensitive_values) -> Dict[str, Any]
         "demographic_parity": float(max(0.0, demographic_parity)),
         "equal_opportunity": float(max(0.0, equal_opportunity)),
     }
+
+
+def predict_label(value: int) -> str:
+    encoder = getattr(app.state, "target_encoder", None)
+    if encoder is not None:
+        try:
+            return str(encoder.inverse_transform([int(value)])[0])
+        except Exception:
+            pass
+
+    if app.state.target_column and app.state.df is not None and app.state.target_column in app.state.df.columns:
+        raw_labels = app.state.df[app.state.target_column].dropna().unique().tolist()
+        if len(raw_labels) == 2 and int(value) in (0, 1):
+            try:
+                ordered_labels = sorted(raw_labels, key=lambda item: float(item))
+            except Exception:
+                ordered_labels = sorted(raw_labels, key=lambda item: str(item))
+            return str(ordered_labels[int(value)])
+
+    return str(int(value))
+
+
+def prediction_summary(value: int) -> str:
+    target = (app.state.target_column or "outcome").replace("_", " ").strip().title()
+    return f"Predicted {target}: {predict_label(value)}"
+
+
+def generate_random_counterfactual(original: Dict[str, Any], rng: np.random.Generator) -> Dict[str, Any]:
+    candidate = dict(original)
+    mutable = [feature for feature in dm.feature_names if feature in candidate and feature != dm.target]
+    if not mutable:
+        return candidate
+
+    change_count = int(min(len(mutable), max(2, rng.integers(2, 5))))
+    selected = list(rng.choice(mutable, size=change_count, replace=False))
+
+    for feature in selected:
+        if feature in dm.numerical_features:
+            series = pd.to_numeric(dm.df[feature], errors="coerce").dropna()
+            if len(series) > 0:
+                quantiles = series.quantile([0.15, 0.35, 0.55, 0.75, 0.9]).tolist()
+                current = float(candidate.get(feature, series.median()))
+                choices = [float(v) for v in quantiles if float(v) != current]
+                if choices:
+                    candidate[feature] = float(choices[int(rng.integers(0, len(choices)))])
+                else:
+                    candidate[feature] = float(current * (1.0 + float(rng.uniform(-0.08, 0.18))))
+            continue
+
+        values = [str(v) for v in dm.df[feature].dropna().astype(str).unique().tolist()]
+        if values:
+            current = str(candidate.get(feature, values[0]))
+            choices = [value for value in values if value != current] or values
+            candidate[feature] = choices[int(rng.integers(0, len(choices)))]
+
+    return candidate
 
 
 @app.exception_handler(HTTPException)
@@ -264,10 +330,15 @@ async def predict(request: PredictRequest):
         features = merge_with_defaults(request.features)
         processed_input = dm.transform_input(features)
         pred, prob = mm.predict(processed_input)
+        prediction_value = int(pred[0])
+        target_column = app.state.target_column or dm.target or "outcome"
         return success(
             {
-                "prediction": int(pred[0]),
+                "prediction": prediction_value,
+                "prediction_label": predict_label(prediction_value),
+                "prediction_summary": prediction_summary(prediction_value),
                 "probability": float(np.max(prob[0])),
+                "target_column": target_column,
                 "features": features,
             }
         )
@@ -283,6 +354,7 @@ async def get_counterfactuals(request: CounterfactualRequest):
         if cf_engine is None:
             raise HTTPException(status_code=400, detail="Counterfactual engine not initialized")
 
+        rng = np.random.default_rng()
         original = merge_with_defaults(request.features)
         original_df = pd.DataFrame([original])
         cf_records = []
@@ -298,19 +370,19 @@ async def get_counterfactuals(request: CounterfactualRequest):
 
         if not cf_records:
             for i in range(request.num_counterfactuals):
-                candidate = original.copy()
-                for feature in dm.numerical_features[:3]:
-                    value = float(candidate.get(feature, 0))
-                    candidate[feature] = value * (1 + (0.04 * (i + 1)))
-                for attr in dm.sensitive_attributes:
-                    current = str(candidate.get(attr, ""))
-                    unique_values = [str(v) for v in dm.df[attr].dropna().unique().tolist()]
-                    if current in unique_values and len(unique_values) > 1:
-                        next_index = (unique_values.index(current) + 1) % len(unique_values)
-                        candidate[attr] = unique_values[next_index]
-                    elif unique_values:
-                        candidate[attr] = unique_values[0]
+                cf_records.append(generate_random_counterfactual(original, rng))
+
+        existing_signatures = set()
+        for cf in cf_records:
+            signature = tuple(sorted((k, str(v)) for k, v in merge_with_defaults(cf).items()))
+            existing_signatures.add(signature)
+
+        while len(cf_records) < request.num_counterfactuals:
+            candidate = generate_random_counterfactual(original, rng)
+            signature = tuple(sorted((k, str(v)) for k, v in candidate.items()))
+            if signature not in existing_signatures:
                 cf_records.append(candidate)
+                existing_signatures.add(signature)
 
         original_pred = int(mm.predict(dm.transform_input(original))[0][0])
         changed_features = []
@@ -331,6 +403,7 @@ async def get_counterfactuals(request: CounterfactualRequest):
                 "counterfactuals": normalized_cfs,
                 "changed_features": changed_features,
                 "prediction_changed": prediction_changed,
+                "summary": "Each alternative changes a small set of dataset-specific features to show how the decision responds under different what-if scenarios.",
             }
         )
     except HTTPException:
@@ -358,14 +431,20 @@ async def get_fairness_metrics():
             score, bias_details = fallback["score"], fallback["details"]
 
         fairness = compute_fairness_summary(y, y_pred, dm.df[sensitive_attr])
-        biased_indices = [int(b.get("index")) for b in bias_details if bool(b.get("bias_flag"))]
+        biased_individuals = [b for b in bias_details if bool(b.get("bias_flag"))]
 
         return success(
             {
                 "counterfactual_fairness_score": float(score),
                 "demographic_parity": fairness["demographic_parity"],
                 "equal_opportunity": fairness["equal_opportunity"],
-                "biased_individuals": biased_indices,
+                "biased_individuals": biased_individuals,
+                "biased_individuals_count": len(biased_individuals),
+                "counterfactual_summary": (
+                    f"{len(biased_individuals)} of {len(bias_details)} checked records changed when {sensitive_attr.replace('_', ' ')} changed."
+                    if bias_details
+                    else "No counterfactual flips were detected in the sampled records."
+                ),
                 "group_metrics": fairness["group_metrics"],
             }
         )
@@ -462,53 +541,93 @@ async def get_causal_results():
 
         treatment = infer_sensitive_attr()
         outcome = dm.target
+        readable_treatment = treatment.replace("_", " ").title()
+        readable_outcome = outcome.replace("_", " ").title()
 
         try:
             results = ce.estimate_effect()
             ate = float(results.get("ate", 0.0))
             sign = "increases" if ate > 0 else "decreases"
             interpretation = (
-                f"Average Treatment Effect (ATE) measures the average change in predicted '{outcome}' when treatment '{treatment}' changes. "
+                f"Average Treatment Effect (ATE) measures the average change in {readable_outcome} when {readable_treatment} changes. "
                 f"Current estimate ({ate:.4f}) suggests treatment typically {sign} the favorable outcome."
             )
         except Exception:
             ate = 0.0
             interpretation = (
-                f"ATE captures average causal impact of '{treatment}' on '{outcome}'. "
+                f"ATE captures average causal impact of {readable_treatment} on {readable_outcome}. "
                 "DoWhy estimation failed for current assumptions, so a conservative zero effect is shown."
             )
 
-        cate = {}
-        attr = treatment
-        for val in dm.df[attr].dropna().unique()[:8]:
-            mask = dm.df[attr] == val
-            y = dm.processed_df.loc[mask, dm.target]
-            if len(y) == 0:
-                cate[str(val)] = 0.0
-                continue
+        group_effects = []
+        try:
+            attr = treatment
+            overall_mean_value = pd.to_numeric(dm.processed_df[dm.target], errors="coerce").mean()
+            overall_mean = float(0.0 if pd.isna(overall_mean_value) else overall_mean_value)
+            raw_attr = dm.df[attr]
 
-            # Some datasets use pandas StringDtype for target values.
-            # Always coerce non-numeric targets before mean reduction.
-            if not pd.api.types.is_numeric_dtype(y):
-                y_numeric = pd.to_numeric(y, errors='coerce')
-                if y_numeric.notna().any():
-                    y = y_numeric.fillna(0)
+            if pd.api.types.is_numeric_dtype(raw_attr):
+                unique_values = raw_attr.dropna().unique().tolist()
+                if len(unique_values) > 8:
+                    buckets = pd.qcut(raw_attr.rank(method="first"), q=min(5, len(unique_values)), duplicates="drop")
+                    for interval in buckets.cat.categories:
+                        mask = buckets.astype(str) == str(interval)
+                        subgroup = pd.to_numeric(dm.processed_df.loc[mask, dm.target], errors="coerce")
+                        effect = float(subgroup.mean() - overall_mean) if len(subgroup) else 0.0
+                        group_effects.append(
+                            {
+                                "label": f"{readable_treatment} {interval}",
+                                "effect": effect,
+                                "explanation": f"Average {readable_outcome.lower()} tendency for records in this range compared with the dataset average.",
+                            }
+                        )
                 else:
-                    le = LabelEncoder()
-                    y = pd.Series(le.fit_transform(y.fillna("Unknown").astype(str)), index=y.index)
+                    for val in unique_values[:8]:
+                        mask = raw_attr == val
+                        subgroup = pd.to_numeric(dm.processed_df.loc[mask, dm.target], errors="coerce")
+                        effect = float(subgroup.mean() - overall_mean) if len(subgroup) else 0.0
+                        group_effects.append(
+                            {
+                                "label": f"{readable_treatment}: {val}",
+                                "effect": effect,
+                                "explanation": "This subgroup's average outcome compared with the dataset average.",
+                            }
+                        )
+            else:
+                for val in raw_attr.dropna().astype(str).unique()[:8]:
+                    mask = raw_attr.astype(str) == val
+                    subgroup = pd.to_numeric(dm.processed_df.loc[mask, dm.target], errors="coerce")
+                    effect = float(subgroup.mean() - overall_mean) if len(subgroup) else 0.0
+                    group_effects.append(
+                        {
+                            "label": f"{readable_treatment}: {val}",
+                            "effect": effect,
+                            "explanation": f"Average {readable_outcome.lower()} tendency for this subgroup compared with the dataset average.",
+                        }
+                    )
+        except Exception as exc:
+            logger.warning("Causal subgroup breakdown failed: %s", exc)
+            group_effects = [
+                {
+                    "label": "Overall",
+                    "effect": ate,
+                    "explanation": "Subgroup breakdown could not be computed, so the overall effect is shown instead.",
+                }
+            ]
 
-            cate[str(val)] = float(y.mean())
+        cate = {item["label"]: item["effect"] for item in group_effects}
 
         notes = [
-            f"ATE is global average effect across all records.",
-            f"CATE breakdown shows subgroup-level outcome tendency by '{attr}'.",
-            "Larger positive values indicate stronger favorable effect in that subgroup.",
+            f"The ATE value summarizes the overall effect of {readable_treatment} on {readable_outcome}.",
+            f"Each CATE bar compares a subgroup against the dataset average. Positive values mean the subgroup trends more favorably than average.",
+            "Use the globe labels to spot which subgroups matter most, then read the explanation card for the plain-English interpretation.",
         ]
 
         return success(
             {
                 "ate": ate,
                 "cate": cate,
+                "group_effects": group_effects,
                 "treatment": treatment,
                 "outcome": outcome,
                 "interpretation": interpretation,
