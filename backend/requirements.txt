@@ -11,6 +11,7 @@ plotly
 pydantic
 python-multipart
 python-logging-loki
+google-genai
 google-generativeai>=0.5.0
 python-dotenv
 fpdf2

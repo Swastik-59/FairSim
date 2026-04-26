@@ -1,7 +1,11 @@
-from google import genai
 import os
 import json
 from typing import Optional, Dict, List, Any
+
+try:
+    from google import genai
+except Exception:
+    genai = None
 
 # Lazy-init: defer configuration until first use so load_dotenv() has time to run
 _client = None
@@ -10,6 +14,10 @@ _client = None
 def _get_client():
     """Lazily configure the Gemini SDK client and return it."""
     global _client
+    if genai is None:
+        raise RuntimeError(
+            "Gemini SDK is not installed. Add 'google-genai' to requirements and rebuild the image."
+        )
     if _client is None:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
