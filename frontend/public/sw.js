@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'fairsim-v1'
+const CACHE_VERSION = 'fairsim-v2'
 const STATIC_ASSETS = ['/', '/favicon.ico']
 
 // Assets to cache immediately on install
