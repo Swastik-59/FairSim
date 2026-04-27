@@ -1,8 +1,9 @@
 'use client'
 
+import { memo } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
-export function CausalChart({ data }: { data: Array<{ group: string; effect: number }> }) {
+export const CausalChart = memo(function CausalChart({ data }: { data: Array<{ group: string; effect: number }> }) {
   return (
     <div className="h-[280px] w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -16,4 +17,4 @@ export function CausalChart({ data }: { data: Array<{ group: string; effect: num
       </ResponsiveContainer>
     </div>
   )
-}
+})

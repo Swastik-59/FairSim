@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { cn } from '@/lib/utils'
 
 type BadgeVariant = 'neutral' | 'success' | 'danger' | 'accent'
@@ -9,7 +10,7 @@ const styles: Record<BadgeVariant, string> = {
   accent: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-300',
 }
 
-export function Badge({
+export const Badge = memo(function Badge({
   children,
   variant = 'neutral',
   className,
@@ -23,4 +24,4 @@ export function Badge({
       {children}
     </span>
   )
-}
+})

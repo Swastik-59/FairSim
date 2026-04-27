@@ -1,8 +1,9 @@
 'use client'
 
+import { memo } from 'react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
-export function SimulationChart({
+export const SimulationChart = memo(function SimulationChart({
   data,
 }: {
   data: Array<{ step: number; fairness: number }>
@@ -26,4 +27,4 @@ export function SimulationChart({
       </ResponsiveContainer>
     </div>
   )
-}
+})

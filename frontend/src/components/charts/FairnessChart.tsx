@@ -1,8 +1,9 @@
 'use client'
 
+import { memo } from 'react'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 
-export function FairnessChart({
+export const FairnessChart = memo(function FairnessChart({
   data,
 }: {
   data: Array<{ metric: string; value: number }>
@@ -18,4 +19,4 @@ export function FairnessChart({
       </ResponsiveContainer>
     </div>
   )
-}
+})

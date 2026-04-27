@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { Navbar } from '@/components/layout/Navbar'
 import { WorkflowProvider } from '@/lib/WorkflowContext'
+import { AppInitializer } from '@/components/AppInitializer'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable}>
       <body>
+        <AppInitializer />
         <WorkflowProvider>
           <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
             <div

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { getColumns, runSimulation } from '@/lib/api'
 import { ColumnSchema, SimulationResult } from '@/lib/types'
 import { GlassCard } from '@/components/ui/GlassCard'
+import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen'
 import SimulationStory from '@/components/gemini/SimulationStory'
 import { useWorkflow } from '@/lib/WorkflowContext'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -23,6 +24,7 @@ export default function SimulatePage() {
   const [groupShift, setGroupShift] = useState<number>(0)
   const [featureShifts, setFeatureShifts] = useState<Record<string, number>>({})
   const [result, setResult] = useState<SimulationResult | null>(null)
+  const [initialLoading, setInitialLoading] = useState(true)
   const api = useApiCall<SimulationResult>()
   const metaApi = useApiCall<Awaited<ReturnType<typeof getColumns>>>()
 
@@ -33,7 +35,10 @@ export default function SimulatePage() {
   useEffect(() => {
     const loadMeta = async () => {
       const meta = await metaApi.call(() => getColumns())
-      if (!meta) return
+      if (!meta) {
+        setInitialLoading(false)
+        return
+      }
       const numericSchema = meta.feature_schema.filter((f) => f.is_numeric).slice(0, 4)
       setSchema(numericSchema)
       const initialShifts = numericSchema.reduce<Record<string, number>>((acc, field) => {
@@ -43,6 +48,7 @@ export default function SimulatePage() {
       setFeatureShifts(initialShifts)
       setSensitiveAttrs(meta.current_sensitive)
       setActiveSensitive(meta.current_sensitive[0] ?? '')
+      setInitialLoading(false)
     }
     void loadMeta()
   }, [])
@@ -63,6 +69,15 @@ export default function SimulatePage() {
   }, [groupShift, featureShifts, activeSensitive])
 
   const chartData = useMemo(() => result?.timeline ?? [], [result])
+
+  if (initialLoading) {
+    return (
+      <PageLoadingScreen
+        title="Preparing simulation environment"
+        subtitle="FairSim is loading your dataset schema and configuring interactive sliders for distribution shift analysis."
+      />
+    )
+  }
 
   const SliderRow = ({
     label,

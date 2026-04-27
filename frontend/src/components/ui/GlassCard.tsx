@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useState, useRef } from 'react'
+import { useState, useRef, memo } from 'react'
 import { cn } from '@/lib/utils'
 
 interface GlassCardProps {
@@ -13,7 +13,7 @@ interface GlassCardProps {
   onClick?: () => void
 }
 
-export function GlassCard({ children, className, style, spotlight = false, hover = true, onClick }: GlassCardProps) {
+export const GlassCard = memo(function GlassCard({ children, className, style, spotlight = false, hover = true, onClick }: GlassCardProps) {
   const [spotPos, setSpotPos] = useState({ x: 0, y: 0 })
   const [isHovered, setIsHovered] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -71,4 +71,4 @@ export function GlassCard({ children, className, style, spotlight = false, hover
       {children}
     </motion.div>
   )
-}
+})

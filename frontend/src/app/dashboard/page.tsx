@@ -8,6 +8,7 @@ import { getCausalEffects, getFairnessMetrics } from '@/lib/api'
 import { FairnessMetrics } from '@/lib/types'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { MetricCard } from '@/components/ui/MetricCard'
+import { PageLoadingScreen } from '@/components/ui/PageLoadingScreen'
 import { useApiCall } from '@/lib/useApiCall'
 import { useWorkflow } from '@/lib/WorkflowContext'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -58,6 +59,15 @@ export default function DashboardPage() {
 
   if (!isModelTrained) {
     return <EmptyState message="Upload and train a dataset to unlock your dashboard." />
+  }
+
+  if (loading) {
+    return (
+      <PageLoadingScreen
+        title="Loading fairness metrics"
+        subtitle="FairSim is computing counterfactual fairness scores, demographic parity, causal effects, and preparing your model telemetry dashboard."
+      />
+    )
   }
 
   return (

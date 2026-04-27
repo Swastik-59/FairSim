@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
-import { useEffect } from 'react'
+import { memo, useEffect } from 'react'
 import { LucideIcon } from 'lucide-react'
 import { GlassCard } from './GlassCard'
 
@@ -15,7 +15,7 @@ interface MetricCardProps {
   animate?: boolean
 }
 
-export function MetricCard({
+export const MetricCard = memo(function MetricCard({
   label,
   value,
   unit,
@@ -91,4 +91,4 @@ export function MetricCard({
       {subtext ? <p style={{ marginTop: '8px', fontSize: '12px', color: subtextColors[subtextType] }}>{subtext}</p> : null}
     </GlassCard>
   )
-}
+})
