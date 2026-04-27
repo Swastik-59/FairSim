@@ -1,4 +1,6 @@
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const apiBaseUrl =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === 'production' ? 'https://fairsim.onrender.com' : 'http://localhost:8000')
 
 const nextConfig = {
   experimental: {
